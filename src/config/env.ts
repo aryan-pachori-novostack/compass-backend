@@ -45,6 +45,18 @@ export const env = {
     log_query_params: process.env.LOGGER_LOG_QUERY_PARAMS !== 'false', // Default true
     sensitive_fields: (process.env.LOGGER_SENSITIVE_FIELDS || 'password,authorization,token').split(',').map(s => s.trim()),
   },
+  
+  // OCR Service configuration
+  ocr: {
+    service_url: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+    api_key: process.env.OCR_SERVICE_API_KEY || undefined,
+  },
+  
+  // Redis configuration
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    ocr_result_channel: process.env.OCR_RESULT_CHANNEL || 'ocr_results',
+  },
 };
 
 export default env;

@@ -30,6 +30,10 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# Uploads and temporary files
+uploads/
+temp/
+
 # OS files
 .DS_Store
 .DS_Store?

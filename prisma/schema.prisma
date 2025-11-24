@@ -258,6 +258,8 @@ model Order {
   status          OrderStatus @default(DOCUMENT_PENDING)
   total_fee_amount Float?
   fee_currency     String?
+  group_name       String?
+  travel_dates     String? // JSON string or comma-separated dates
 
   partner         PartnerAccount @relation(fields: [partner_id], references: [id])
   visa_type       VisaType       @relation(fields: [visa_type_id], references: [id])
@@ -301,6 +303,13 @@ model OrderTraveller {
 // ORDER TRAVELLER DOCUMENT
 // -----------------------------------------------------
 
+enum OcrStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model OrderTravellerDocument {
   id                           String   @id @default(uuid())
   order_traveller_document_id  String   @default(uuid())
@@ -313,6 +322,10 @@ model OrderTravellerDocument {
   verification_notes           String?
   uploaded_at                  DateTime @default(now())
   verified_at                  DateTime?
+
+  ocr_status                   OcrStatus?
+  ocr_job_id                   String?
+  ocr_extracted_data           Json?
 
   order            Order                @relation(fields: [order_id], references: [id])
   traveller        OrderTraveller?      @relation(fields: [traveller_id], references: [id])

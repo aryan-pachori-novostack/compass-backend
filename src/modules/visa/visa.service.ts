@@ -60,21 +60,21 @@ class VisaService {
   async getVisaTypesByCountryId(params: GetVisaTypesParams): Promise<PaginatedVisaTypeResponse> {
     const { country_id, search, page = 1, page_size = 10 } = params;
     try {
-      // First verify country exists
-      const country = await prisma.country.findUnique({
+      // First verify country exists using country_id (UUID field)
+      const country = await prisma.country.findFirst({
         where: {
-          id: country_id,
+          country_id: country_id,
         },
       });
 
       if (!country) {
-        throw new Error(`Country with id '${country_id}' not found`);
+        throw new Error(`Country with country_id '${country_id}' not found`);
       }
 
-      // Build where clause
+      // Build where clause using country's primary id (for foreign key relationship)
       const search_term = search?.trim().toLowerCase() || '';
       const where_clause: any = {
-        country_id: country_id,
+        country_id: country.id, // Use country's primary id for foreign key
         is_active: true,
       };
 
@@ -128,7 +128,7 @@ class VisaService {
       const mapped_visa_types = visa_types.map((visa_type) => ({
         id: visa_type.id,
         visa_type_id: visa_type.visa_type_id,
-        country_id: visa_type.country_id,
+        country_id: country.country_id, // Return UUID country_id instead of primary id
         code: visa_type.code,
         name: visa_type.name,
         category: visa_type.category,

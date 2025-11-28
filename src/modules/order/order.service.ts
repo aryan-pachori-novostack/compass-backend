@@ -70,9 +70,22 @@ class OrderService {
         }
       }
 
-      // Verify visa type and country exist
-      const visa_type = await prisma.visaType.findUnique({
-        where: { id: input.visa_type_id },
+      // Verify country exists using country_id (UUID field)
+      const country = await prisma.country.findFirst({
+        where: {
+          country_id: input.country_id,
+        },
+      });
+
+      if (!country) {
+        throw new Error(`Country with country_id '${input.country_id}' not found`);
+      }
+
+      // Verify visa type exists using visa_type_id (UUID field)
+      const visa_type = await prisma.visaType.findFirst({
+        where: {
+          visa_type_id: input.visa_type_id,
+        },
         include: {
           country: true,
           visa_fees: {
@@ -91,10 +104,11 @@ class OrderService {
       });
 
       if (!visa_type) {
-        throw new Error(`Visa type with id '${input.visa_type_id}' not found`);
+        throw new Error(`Visa type with visa_type_id '${input.visa_type_id}' not found`);
       }
 
-      if (visa_type.country_id !== input.country_id) {
+      // Verify visa type belongs to the country (compare using country's primary id)
+      if (visa_type.country_id !== country.id) {
         throw new Error('Country ID does not match visa type country');
       }
 
@@ -103,21 +117,21 @@ class OrderService {
       const total_fee_amount = fee ? fee.base_fee_amount + (fee.service_fee_amount || 0) + (fee.tax_amount || 0) : null;
       const fee_currency = fee?.currency || null;
 
-      // Get required documents for this visa type
+      // Get required documents for this visa type (use visa type's primary id)
       const required_documents = await prisma.visaRequiredDocument.findMany({
         where: {
-          visa_type_id: input.visa_type_id,
+          visa_type_id: visa_type.id, // Use visa type's primary id for foreign key
         },
       });
 
       // Use transaction for all operations
       const result = await prisma.$transaction(async (tx) => {
-        // Create order
+        // Create order (use primary ids for foreign keys)
         const order = await tx.order.create({
           data: {
             partner_id: partner_id,
-            visa_type_id: input.visa_type_id,
-            country_id: input.country_id,
+            visa_type_id: visa_type.id, // Use visa type's primary id for foreign key
+            country_id: country.id, // Use country's primary id for foreign key
             order_type: input.order_type,
             status: 'DOCUMENT_PENDING',
             total_fee_amount,
@@ -299,12 +313,23 @@ class OrderService {
           where: { order_id: order.id },
         });
 
+        // Get country and visa type to return UUIDs in response
+        const order_country = await tx.country.findUnique({
+          where: { id: order.country_id },
+          select: { country_id: true },
+        });
+
+        const order_visa_type = await tx.visaType.findUnique({
+          where: { id: order.visa_type_id },
+          select: { visa_type_id: true },
+        });
+
         return {
           id: order.id,
           order_id: order.order_id,
           partner_id: order.partner_id,
-          visa_type_id: order.visa_type_id,
-          country_id: order.country_id,
+          visa_type_id: order_visa_type?.visa_type_id || input.visa_type_id, // Return UUID visa_type_id
+          country_id: order_country?.country_id || input.country_id, // Return UUID country_id
           order_type: order.order_type,
           status: order.status,
           group_name: order.group_name,

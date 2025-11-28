@@ -13,7 +13,7 @@ RUN npm ci
 COPY . .
 
 # Generate Prisma Client and build
-RUN npx prisma generate && npm run build
+RUN ./node_modules/.bin/prisma generate && npm run build
 
 # Create uploads and logs directories
 RUN mkdir -p uploads logs

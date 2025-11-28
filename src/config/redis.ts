@@ -12,7 +12,7 @@ export function get_redis_client(): Redis {
   if (!redis_client) {
     try {
       redis_client = new Redis(env.redis.url, {
-        retryStrategy: (times) => {
+        retryStrategy: (times: number) => {
           const delay = Math.min(times * 50, 2000);
           return delay;
         },
@@ -23,7 +23,7 @@ export function get_redis_client(): Redis {
         logger.info('✓ Connected to Redis');
       });
 
-      redis_client.on('error', (error) => {
+      redis_client.on('error', (error: Error) => {
         logger.error('Redis client error:', error);
       });
 
@@ -46,7 +46,7 @@ export function get_redis_subscriber(): Redis {
   if (!redis_subscriber) {
     try {
       redis_subscriber = new Redis(env.redis.url, {
-        retryStrategy: (times) => {
+        retryStrategy: (times: number) => {
           const delay = Math.min(times * 50, 2000);
           return delay;
         },
@@ -57,7 +57,7 @@ export function get_redis_subscriber(): Redis {
         logger.info('✓ Connected to Redis subscriber');
       });
 
-      redis_subscriber.on('error', (error) => {
+      redis_subscriber.on('error', (error: Error) => {
         logger.error('Redis subscriber error:', error);
       });
 

@@ -19,7 +19,7 @@ export interface OCRSubmissionResponse {
 
 class OCRService {
   private readonly ocr_service_url: string;
-  private readonly ocr_api_key?: string;
+  private readonly ocr_api_key: string | undefined;
 
   constructor() {
     this.ocr_service_url = env.ocr.service_url;

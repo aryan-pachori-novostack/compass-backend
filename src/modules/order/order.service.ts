@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.js';
+import { Prisma } from '@prisma/client';
 import { extract_zip_file, cleanup_temp_files, type PassengerFolder } from '../../utils/zip_extractor.js';
 import { get_file_path, delete_file } from '../../utils/file_upload.js';
 import ocr_service from '../ocr/ocr.service.js';
@@ -240,11 +241,12 @@ class OrderService {
                   verified_at: null,
                   ocr_status: null,
                   ocr_job_id: null,
-                  ocr_extracted_data: null,
+                  ocr_extracted_data: Prisma.JsonNull,
                 },
               });
 
               // Trigger OCR for passport documents (async, don't block)
+              const filename_lower = file.filename.toLowerCase();
               if (file.file_type === 'passport' || filename_lower.includes('passport')) {
                 // Submit to OCR service asynchronously (don't await, fire and forget)
                 setImmediate(async () => {

@@ -55,7 +55,7 @@ class OCRResultHandler {
       await this.subscriber.subscribe(channel);
       logger.info(`✓ Subscribed to OCR results channel: ${channel}`);
 
-      this.subscriber.on('message', async (channel_name, message) => {
+      this.subscriber.on('message', async (channel_name: string, message: string) => {
         if (channel_name === channel) {
           await this.handle_ocr_result(message);
         }
@@ -159,8 +159,12 @@ class OCRResultHandler {
    */
   private async update_traveller_from_ocr(
     traveller_id: string,
-    ocr_data: OCRResultMessage['result']['data']
+    ocr_data: OCRResultMessage['result']['data'] | undefined
   ): Promise<void> {
+    if (!ocr_data) {
+      return;
+    }
+
     try {
       const update_data: any = {};
 

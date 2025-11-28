@@ -2,16 +2,21 @@ import Redis from 'ioredis';
 import { env } from './env.js';
 import logger from '../utils/logger.js';
 
-let redis_client: Redis | null = null;
-let redis_subscriber: Redis | null = null;
+// Type for Redis client instance
+// Workaround for ES modules: extract type from the Redis constructor
+const _RedisConstructor = Redis as unknown as new (...args: any[]) => any;
+type RedisClient = InstanceType<typeof _RedisConstructor>;
+
+let redis_client: RedisClient | null = null;
+let redis_subscriber: RedisClient | null = null;
 
 /**
  * Get or create Redis client
  */
-export function get_redis_client(): Redis {
+export function get_redis_client(): RedisClient {
   if (!redis_client) {
     try {
-      redis_client = new Redis(env.redis.url, {
+      redis_client = new (Redis as any)(env.redis.url, {
         retryStrategy: (times: number) => {
           const delay = Math.min(times * 50, 2000);
           return delay;
@@ -42,10 +47,10 @@ export function get_redis_client(): Redis {
  * Get or create Redis subscriber client
  * (Separate connection for pub/sub)
  */
-export function get_redis_subscriber(): Redis {
+export function get_redis_subscriber(): RedisClient {
   if (!redis_subscriber) {
     try {
-      redis_subscriber = new Redis(env.redis.url, {
+      redis_subscriber = new (Redis as any)(env.redis.url, {
         retryStrategy: (times: number) => {
           const delay = Math.min(times * 50, 2000);
           return delay;

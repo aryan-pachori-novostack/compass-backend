@@ -326,6 +326,7 @@ model OrderTravellerDocument {
   ocr_status                   OcrStatus?
   ocr_job_id                   String?
   ocr_extracted_data           Json?
+  mapped_to_traveller_id       String? // For flight/hotel tickets mapped to passengers
 
   order            Order                @relation(fields: [order_id], references: [id])
   traveller        OrderTraveller?      @relation(fields: [traveller_id], references: [id])

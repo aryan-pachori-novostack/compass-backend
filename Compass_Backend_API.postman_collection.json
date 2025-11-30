@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "compass-backend-api-collection",
 		"name": "Compass Backend API",
-		"description": "Complete API collection for Compass Visa Application Backend\n\n## Setup Instructions\n\n1. **Set Collection Variables:**\n   - `base_url`: Your API base URL (default: http://localhost:3000)\n   - `auth_token`: Will be auto-populated after login\n\n2. **Login First:**\n   - Run the \"Login\" request in the Auth folder\n   - The token will be automatically saved to collection variables\n\n3. **Use Other APIs:**\n   - All other requests will automatically use the saved token\n\n## API Endpoints\n\n- **Auth**: Login to get access token\n- **Countries**: Browse available destination countries\n- **Visa Types**: Get visa options for a country\n- **Orders**: Create visa application orders (Individual or Group)\n- **OCR Status**: Check passport OCR processing status\n\n## File Uploads\n\nFor order creation, use `multipart/form-data` format:\n- Individual orders: Upload passport image file\n- Group orders: Upload ZIP file with traveler folders",
+		"description": "Complete API collection for Compass Visa Application Backend\n\n## Setup Instructions\n\n1. **Set Collection Variables:**\n   - `base_url`: Your API base URL (default: http://52.66.114.179:3000 - Dev Server)\n   - `auth_token`: Will be auto-populated after login\n\n2. **Login First:**\n   - Run the \"Login\" request in the Auth folder\n   - The token will be automatically saved to collection variables\n\n3. **Use Other APIs:**\n   - All other requests will automatically use the saved token\n\n## API Endpoints\n\n- **Auth**: Login to get access token\n- **Countries**: Browse available destination countries\n- **Visa Types**: Get visa options for a country\n- **Orders**: Create visa application orders (Individual or Group)\n- **OCR Status**: Check passport OCR processing status\n\n## File Uploads\n\nFor order creation, use `multipart/form-data` format:\n- Individual orders: Upload passport image file\n- Group orders: Upload ZIP file with traveler folders",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "compass-backend"
 	},
@@ -441,7 +441,7 @@
 				"exec": [
 					"// Auto-set base URL if not set",
 					"if (!pm.collectionVariables.get('base_url')) {",
-					"    pm.collectionVariables.set('base_url', 'http://localhost:3000');",
+					"    pm.collectionVariables.set('base_url', 'http://52.66.114.179:3000');",
 					"}"
 				]
 			}
@@ -465,7 +465,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "http://localhost:3000",
+			"value": "http://52.66.114.179:3000",
 			"type": "string"
 		},
 		{

@@ -48,7 +48,7 @@ export const env = {
   
   // OCR Service configuration
   ocr: {
-    service_url: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+    service_url: process.env.OCR_MICROSERVICE_URL || 'http://localhost:8001',
     api_key: process.env.OCR_SERVICE_API_KEY || undefined,
   },
   
@@ -56,6 +56,15 @@ export const env = {
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     ocr_result_channel: process.env.OCR_RESULT_CHANNEL || 'ocr_results',
+    ocr_progress_channel: process.env.OCR_PROGRESS_CHANNEL || 'ocr_progress',
+  },
+  
+  // S3 configuration
+  s3: {
+    access_key_id: process.env.AWS_ACCESS_KEY_ID || '',
+    secret_access_key: process.env.AWS_SECRET_ACCESS_KEY || '',
+    region: process.env.AWS_REGION || 'us-east-1',
+    bucket_name: process.env.S3_BUCKET_NAME || '',
   },
 };
 

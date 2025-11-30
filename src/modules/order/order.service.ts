@@ -2,7 +2,8 @@ import prisma from '../../config/prisma.js';
 import { Prisma } from '@prisma/client';
 import { extract_zip_file, cleanup_temp_files, type PassengerFolder } from '../../utils/zip_extractor.js';
 import { get_file_path, delete_file } from '../../utils/file_upload.js';
-import ocr_service from '../ocr/ocr.service.js';
+import { upload_to_s3 } from '../../utils/s3.js';
+import { env } from '../../config/env.js';
 import logger from '../../utils/logger.js';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -212,22 +213,35 @@ class OrderService {
             }
 
             if (matched_document) {
-              // Move file to permanent storage
-              const uploads_dir = path.join(process.cwd(), 'uploads', 'orders', order.order_id);
-              if (!fs.existsSync(uploads_dir)) {
-                fs.mkdirSync(uploads_dir, { recursive: true });
-              }
-
+              // Upload file to S3
               const file_ext = path.extname(file.filename);
-              const new_filename = `${traveller.order_traveller_id}-${matched_document.document_code}-${Date.now()}${file_ext}`;
-              const permanent_path = path.join(uploads_dir, new_filename);
-
-              // Copy file to permanent location
-              if (fs.existsSync(file.file_path)) {
-                fs.copyFileSync(file.file_path, permanent_path);
+              const s3_key = `orders/${order.order_id}/travellers/${traveller.order_traveller_id}/${file.file_type}/${Date.now()}-${file.filename}`;
+              
+              let s3_url: string;
+              try {
+                // Determine content type
+                const ext = file_ext.slice(1).toLowerCase();
+                let content_type = 'application/octet-stream';
+                if (['jpg', 'jpeg'].includes(ext)) content_type = 'image/jpeg';
+                else if (ext === 'png') content_type = 'image/png';
+                else if (ext === 'pdf') content_type = 'application/pdf';
+                
+                const upload_result = await upload_to_s3({
+                  file_path: file.file_path,
+                  s3_key: s3_key,
+                  content_type: content_type,
+                  metadata: {
+                    order_id: order.order_id,
+                    traveller_id: traveller.order_traveller_id,
+                    document_type: file.file_type,
+                    original_filename: file.filename,
+                  },
+                });
+                s3_url = upload_result.s3_url;
+              } catch (error) {
+                logger.error(`Failed to upload file to S3: ${file.filename}`, error);
+                throw new Error(`Failed to upload file to S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
               }
-
-              const file_url = `/uploads/orders/${order.order_id}/${new_filename}`;
 
               // Create document record
               const document = await tx.orderTravellerDocument.create({
@@ -235,63 +249,15 @@ class OrderService {
                   order_id: order.id,
                   traveller_id: traveller.id,
                   required_document_id: matched_document.id,
-                  file_url: file_url,
+                  file_url: s3_url,
                   verification_status: null,
                   verification_notes: null,
                   verified_at: null,
-                  ocr_status: null,
+                  ocr_status: 'PENDING',
                   ocr_job_id: null,
                   ocr_extracted_data: Prisma.JsonNull,
                 },
               });
-
-              // Trigger OCR for passport documents (async, don't block)
-              const filename_lower = file.filename.toLowerCase();
-              if (file.file_type === 'passport' || filename_lower.includes('passport')) {
-                // Submit to OCR service asynchronously (don't await, fire and forget)
-                setImmediate(async () => {
-                  try {
-                    // First update status to PENDING
-                    await prisma.orderTravellerDocument.update({
-                      where: { id: document.id },
-                      data: {
-                        ocr_status: 'PENDING',
-                      },
-                    });
-
-                    const ocr_result = await ocr_service.submit_passport_for_ocr({
-                      order_id: order.order_id,
-                      traveller_id: traveller.order_traveller_id,
-                      document_id: document.order_traveller_document_id,
-                      file_path: permanent_path,
-                    });
-
-                    // Update document with OCR job ID and status
-                    await prisma.orderTravellerDocument.update({
-                      where: { id: document.id },
-                      data: {
-                        ocr_job_id: ocr_result.job_id,
-                        ocr_status: 'PROCESSING',
-                      },
-                    });
-
-                    logger.info(`OCR job ${ocr_result.job_id} submitted for document ${document.order_traveller_document_id}`);
-                  } catch (error) {
-                    logger.error(`Failed to submit OCR for document ${document.order_traveller_document_id}:`, error);
-                    // Update status to FAILED
-                    try {
-                      await prisma.orderTravellerDocument.update({
-                        where: { id: document.id },
-                        data: {
-                          ocr_status: 'FAILED',
-                        },
-                      });
-                    } catch (update_error) {
-                      logger.error('Failed to update OCR status:', update_error);
-                    }
-                  }
-                });
-              }
             }
           }
         }
@@ -344,6 +310,15 @@ class OrderService {
         };
       });
 
+      // Send documents to OCR microservice asynchronously (fire and forget)
+      setImmediate(async () => {
+        try {
+          await this.send_documents_to_ocr_service(result.order_id);
+        } catch (error) {
+          logger.error(`Failed to send documents to OCR service for order ${result.order_id}:`, error);
+        }
+      });
+
       return result;
     } catch (error) {
       if (error instanceof Error) {
@@ -351,6 +326,104 @@ class OrderService {
       }
       throw new Error(`Failed to create order: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Send documents to OCR microservice for processing
+   */
+  private async send_documents_to_ocr_service(order_id: string): Promise<void> {
+    try {
+      // Find order by order_id (business ID)
+      const order = await prisma.order.findFirst({
+        where: { order_id },
+        select: { id: true },
+      });
+
+      if (!order) {
+        logger.warn(`Order not found: ${order_id}`);
+        return;
+      }
+
+      // Get all documents for this order
+      const documents = await prisma.orderTravellerDocument.findMany({
+        where: {
+          order_id: order.id,
+        },
+        include: {
+          traveller: {
+            select: {
+              order_traveller_id: true,
+              full_name: true,
+            },
+          },
+        },
+      });
+
+      if (documents.length === 0) {
+        logger.warn(`No documents found for order ${order_id}`);
+        return;
+      }
+
+      // Group documents by type and prepare payload
+      // Need to get file_type from S3 key path or metadata
+      const documents_payload = documents.map((doc) => {
+        // Extract document type from S3 key path (format: orders/{order_id}/travellers/{traveller_id}/{document_type}/...)
+        const s3_key = doc.file_url.replace(/^s3:\/\/[^\/]+\//, '').replace(/^https?:\/\/[^\/]+\//, '');
+        const path_parts = s3_key.split('/');
+        const doc_type_from_path = path_parts.length >= 4 ? path_parts[3] : 'other';
+        
+        return {
+          traveller_id: doc.traveller?.order_traveller_id || '',
+          traveller_name: doc.traveller?.full_name || '',
+          document_id: doc.order_traveller_document_id,
+          file_url: doc.file_url,
+          document_type: this.determine_document_type(doc.file_url, doc_type_from_path),
+        };
+      });
+
+      // Send to OCR microservice
+      const ocr_service_url = env.ocr.service_url;
+      const response = await fetch(`${ocr_service_url}/process/documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id,
+          documents: documents_payload,
+        }),
+      });
+
+      if (!response.ok) {
+        const error_text = await response.text();
+        throw new Error(`OCR microservice error: ${response.status} - ${error_text}`);
+      }
+
+      logger.info(`Documents sent to OCR microservice for order ${order_id}`);
+    } catch (error) {
+      logger.error(`Failed to send documents to OCR service:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Determine document type from file URL or other metadata
+   */
+  private determine_document_type(file_url: string, file_type?: string): string {
+    // Use file_type from zip extractor if available
+    if (file_type) {
+      return file_type;
+    }
+    
+    const url_lower = file_url.toLowerCase();
+    
+    if (url_lower.includes('passport_front')) return 'passport_front';
+    if (url_lower.includes('passport_back')) return 'passport_back';
+    if (url_lower.includes('passport')) return 'passport';
+    if (url_lower.includes('flight')) return 'flight';
+    if (url_lower.includes('hotel')) return 'hotel';
+    
+    return 'other';
   }
 }
 

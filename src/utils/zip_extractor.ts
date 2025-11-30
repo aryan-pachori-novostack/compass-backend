@@ -15,7 +15,8 @@ export interface PassengerFile {
 
 /**
  * Extract zip file and parse passenger folders
- * Expected structure: zip contains folders, each folder is a passenger
+ * Expected structure: main_folder/passengers/passenger_name/files
+ * Supports both old structure (passenger_name/files) and new structure (main_folder/passengers/passenger_name/files)
  */
 export async function extract_zip_file(zip_file_path: string): Promise<PassengerFolder[]> {
   const passengers: PassengerFolder[] = [];
@@ -33,17 +34,29 @@ export async function extract_zip_file(zip_file_path: string): Promise<Passenger
         continue;
       }
 
-      // Get folder name (passenger name) - first level folder
+      // Get folder structure
       const entry_path = entry.entryName;
       const path_parts = entry_path.split('/').filter((p: string) => p.length > 0);
       
       if (path_parts.length < 2) {
-        // Files in root, skip or handle differently
+        // Files in root, skip
         continue;
       }
 
-      const passenger_name = path_parts[0];
-      const filename = path_parts[path_parts.length - 1];
+      // Handle new structure: main_folder/passengers/passenger_name/files
+      // Or old structure: passenger_name/files
+      let passenger_name: string;
+      let filename: string;
+
+      // Check if structure is main_folder/passengers/passenger_name/files
+      if (path_parts.length >= 3 && path_parts[1].toLowerCase() === 'passengers') {
+        passenger_name = path_parts[2];
+        filename = path_parts[path_parts.length - 1];
+      } else {
+        // Old structure: passenger_name/files
+        passenger_name = path_parts[0];
+        filename = path_parts[path_parts.length - 1];
+      }
 
       if (!passenger_name || !filename) {
         continue;
@@ -78,9 +91,20 @@ export async function extract_zip_file(zip_file_path: string): Promise<Passenger
         const lower_filename = filename.toLowerCase();
         let file_type = 'other';
         
+        // Check for passport files (front/back)
         if (lower_filename.includes('passport')) {
-          file_type = 'passport';
-        } else if (lower_filename.includes('flight') || lower_filename.includes('ticket')) {
+          if (lower_filename.includes('front') || lower_filename.includes('_f') || lower_filename.match(/passport.*front/i)) {
+            file_type = 'passport_front';
+          } else if (lower_filename.includes('back') || lower_filename.includes('_b') || lower_filename.match(/passport.*back/i)) {
+            file_type = 'passport_back';
+          } else {
+            file_type = 'passport';
+          }
+        } else if (lower_filename.includes('front') && (lower_filename.includes('passport') || lower_filename.match(/^front/i))) {
+          file_type = 'passport_front';
+        } else if (lower_filename.includes('back') && (lower_filename.includes('passport') || lower_filename.match(/^back/i))) {
+          file_type = 'passport_back';
+        } else if (lower_filename.includes('flight') || (lower_filename.includes('ticket') && !lower_filename.includes('hotel'))) {
           file_type = 'flight';
         } else if (lower_filename.includes('visa')) {
           file_type = 'visa';

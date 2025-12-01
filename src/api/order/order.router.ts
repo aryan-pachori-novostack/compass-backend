@@ -567,12 +567,21 @@ order_router.get('/:order_id/travellers', auth_guard, async (req: AuthRequest, r
 order_router.post('/:order_id/ocr-results', async (req: Request, res: Response): Promise<void> => {
   try {
     const order_id = req.params.order_id as string;
-    const { document_id, ocr_status, ocr_extracted_data, mapped_to_traveller_id } = req.body;
+    const { 
+      traveller_id, 
+      ticket_type, // 'passport', 'flight', 'hotel'
+      passport_front_doc_id,
+      passport_back_doc_id,
+      document_id, // For flight/hotel
+      ocr_status, 
+      ocr_extracted_data, 
+      mapped_to_traveller_id 
+    } = req.body;
 
-    if (!document_id || !ocr_status) {
+    if (!traveller_id || !ocr_status) {
       res.status(400).json({
         error: 'VALIDATION_ERROR',
-        message: 'document_id and ocr_status are required',
+        message: 'traveller_id and ocr_status are required',
         code: 400,
       });
       return;
@@ -592,46 +601,105 @@ order_router.post('/:order_id/ocr-results', async (req: Request, res: Response):
       return;
     }
 
-    // Find document
-    const document = await prisma.orderTravellerDocument.findFirst({
+    // Find traveller
+    const traveller = await prisma.orderTraveller.findFirst({
       where: {
-        order_traveller_document_id: document_id,
+        order_traveller_id: traveller_id,
         order_id: order.id,
       },
     });
 
-    if (!document) {
+    if (!traveller) {
       res.status(404).json({
         error: 'NOT_FOUND',
-        message: 'Document not found',
+        message: 'Traveller not found',
         code: 404,
       });
       return;
     }
 
-    // Update document
-    await prisma.orderTravellerDocument.update({
-      where: { id: document.id },
-      data: {
-        ocr_status: ocr_status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED',
-        ocr_extracted_data: ocr_extracted_data ? ocr_extracted_data : Prisma.JsonNull,
-        ...(mapped_to_traveller_id ? { mapped_to_traveller_id } : {}),
-      },
-    });
+    // Handle passport (front + back)
+    if (ticket_type === 'passport' && passport_front_doc_id && passport_back_doc_id) {
+      // Find passport documents
+      const passport_front_doc = await prisma.orderTravellerDocument.findFirst({
+        where: {
+          order_traveller_document_id: passport_front_doc_id,
+          order_id: order.id,
+        },
+      });
 
-    // If passport OCR completed, update traveller info
-    if (ocr_status === 'COMPLETED' && ocr_extracted_data && document.traveller_id) {
-      const extracted_data = ocr_extracted_data as any;
-      if (extracted_data.data) {
-        const passport_data = extracted_data.data;
-        
-        await prisma.orderTraveller.update({
-          where: { id: document.traveller_id },
+      const passport_back_doc = await prisma.orderTravellerDocument.findFirst({
+        where: {
+          order_traveller_document_id: passport_back_doc_id,
+          order_id: order.id,
+        },
+      });
+
+      // Update passport front document
+      if (passport_front_doc) {
+        await prisma.orderTravellerDocument.update({
+          where: { id: passport_front_doc.id },
           data: {
-            ...(passport_data.full_name ? { full_name: passport_data.full_name } : {}),
-            ...(passport_data.passport_number ? { passport_number: passport_data.passport_number } : {}),
-            ...(passport_data.date_of_birth ? { date_of_birth: new Date(passport_data.date_of_birth) } : {}),
-            ...(passport_data.expiry_date ? { passport_expiry_date: new Date(passport_data.expiry_date) } : {}),
+            ocr_status: ocr_status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED',
+            ocr_extracted_data: ocr_extracted_data ? ocr_extracted_data : Prisma.JsonNull,
+          },
+        });
+      }
+
+      // Update passport back document
+      if (passport_back_doc) {
+        await prisma.orderTravellerDocument.update({
+          where: { id: passport_back_doc.id },
+          data: {
+            ocr_status: ocr_status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED',
+            ocr_extracted_data: ocr_extracted_data ? ocr_extracted_data : Prisma.JsonNull,
+          },
+        });
+      }
+
+      // Update traveller info from passport OCR
+      if (ocr_status === 'COMPLETED' && ocr_extracted_data) {
+        const extracted_data = ocr_extracted_data as any;
+        if (extracted_data.data) {
+          const passport_data = extracted_data.data;
+          
+          await prisma.orderTraveller.update({
+            where: { id: traveller.id },
+            data: {
+              ...(passport_data.full_name ? { full_name: passport_data.full_name } : {}),
+              ...(passport_data.passport_number ? { passport_number: passport_data.passport_number } : {}),
+              ...(passport_data.date_of_birth ? { date_of_birth: new Date(passport_data.date_of_birth) } : {}),
+              ...(passport_data.expiry_date ? { passport_expiry_date: new Date(passport_data.expiry_date) } : {}),
+            },
+          });
+        }
+      }
+    } 
+    // Handle flight/hotel tickets
+    else if ((ticket_type === 'flight' || ticket_type === 'hotel') && document_id) {
+      // Find ticket document
+      const ticket_doc = await prisma.orderTravellerDocument.findFirst({
+        where: {
+          order_traveller_document_id: document_id,
+          order_id: order.id,
+        },
+      });
+
+      if (ticket_doc) {
+        const mapped_traveller = mapped_to_traveller_id ? 
+          await prisma.orderTraveller.findFirst({
+            where: { order_traveller_id: mapped_to_traveller_id },
+            select: { id: true },
+          }) : null;
+
+        await prisma.orderTravellerDocument.update({
+          where: { id: ticket_doc.id },
+          data: {
+            ocr_status: ocr_status as 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED',
+            ocr_extracted_data: ocr_extracted_data ? ocr_extracted_data : Prisma.JsonNull,
+            ...(mapped_traveller ? {
+              mapped_to_traveller_id: mapped_traveller.id,
+            } : {}),
           },
         });
       }
@@ -640,7 +708,8 @@ order_router.post('/:order_id/ocr-results', async (req: Request, res: Response):
     res.json({
       data: {
         status: 'updated',
-        document_id,
+        traveller_id,
+        ticket_type,
       },
     });
   } catch (error) {
@@ -648,6 +717,57 @@ order_router.post('/:order_id/ocr-results', async (req: Request, res: Response):
     res.status(500).json({
       error: 'INTERNAL_SERVER_ERROR',
       message: error instanceof Error ? error.message : 'Failed to update OCR results',
+      code: 500,
+    });
+  }
+});
+
+// POST /order/:order_id/update-travellers - Update travellers with parsed zip data (called by OCR microservice)
+order_router.post('/:order_id/update-travellers', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const order_id = req.params.order_id as string;
+    const { passengers } = req.body;
+
+    if (!passengers || !Array.isArray(passengers)) {
+      res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'passengers array is required',
+        code: 400,
+      });
+      return;
+    }
+
+    // Find order
+    const order = await prisma.order.findFirst({
+      where: { order_id },
+      include: {
+        travellers: true,
+      },
+    });
+
+    if (!order) {
+      res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Order not found',
+        code: 404,
+      });
+      return;
+    }
+
+    // Update travellers with parsed data (this is informational, actual documents will be created by OCR service)
+    logger.info(`Received parsed data for ${passengers.length} passengers for order ${order_id}`);
+
+    res.json({
+      data: {
+        status: 'received',
+        passengers_count: passengers.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating travellers:', error);
+    res.status(500).json({
+      error: 'INTERNAL_SERVER_ERROR',
+      message: error instanceof Error ? error.message : 'Failed to update travellers',
       code: 500,
     });
   }

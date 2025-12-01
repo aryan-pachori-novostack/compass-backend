@@ -43,14 +43,21 @@ export async function extract_zip_file(zip_file_path: string): Promise<Passenger
         continue;
       }
 
-      // Handle new structure: main_folder/passengers/passenger_name/files
-      // Or old structure: passenger_name/files
+      // Handle different structures:
+      // 1. main_folder/passengers/passenger_name/files
+      // 2. main_folder/passenger_name/files (no passengers folder)
+      // 3. passenger_name/files (old structure)
       let passenger_name: string;
       let filename: string;
 
       // Check if structure is main_folder/passengers/passenger_name/files
       if (path_parts.length >= 3 && path_parts[1].toLowerCase() === 'passengers') {
         passenger_name = path_parts[2];
+        filename = path_parts[path_parts.length - 1];
+      } else if (path_parts.length >= 2) {
+        // Structure: main_folder/passenger_name/files (no passengers folder)
+        // Skip the first part (main folder) and use the second part as passenger name
+        passenger_name = path_parts[1];
         filename = path_parts[path_parts.length - 1];
       } else {
         // Old structure: passenger_name/files
@@ -91,14 +98,19 @@ export async function extract_zip_file(zip_file_path: string): Promise<Passenger
         const lower_filename = filename.toLowerCase();
         let file_type = 'other';
         
-        // Check for passport files (front/back)
-        if (lower_filename.includes('passport')) {
+        // Check for passport files (front/back) - prioritize PPF/PPB patterns
+        // PPF = Passport Front, PPB = Passport Back
+        if (lower_filename.includes('ppf') || lower_filename.match(/\bppf\b/i)) {
+          file_type = 'passport_front';
+        } else if (lower_filename.includes('ppb') || lower_filename.match(/\bppb\b/i)) {
+          file_type = 'passport_back';
+        } else if (lower_filename.includes('passport')) {
           if (lower_filename.includes('front') || lower_filename.includes('_f') || lower_filename.match(/passport.*front/i)) {
             file_type = 'passport_front';
           } else if (lower_filename.includes('back') || lower_filename.includes('_b') || lower_filename.match(/passport.*back/i)) {
             file_type = 'passport_back';
           } else {
-            file_type = 'passport';
+          file_type = 'passport';
           }
         } else if (lower_filename.includes('front') && (lower_filename.includes('passport') || lower_filename.match(/^front/i))) {
           file_type = 'passport_front';

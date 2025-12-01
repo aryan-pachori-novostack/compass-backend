@@ -150,10 +150,16 @@ class OrderService {
           try {
             passengers = await extract_zip_file(input.zip_file_path);
             
+            logger.debug(`Extracted ${passengers.length} passengers from zip file`);
+            passengers.forEach((p, i) => {
+              logger.debug(`Passenger ${i + 1}: ${p.passenger_name} with ${p.files.length} files`);
+            });
+            
             if (passengers.length === 0) {
               throw new Error('No passenger folders found in zip file');
             }
           } catch (error) {
+            logger.error('Failed to extract zip file:', error);
             throw new Error(`Failed to process zip file: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         } else if (input.order_type === 'INDIVIDUAL' && input.traveller_name && input.traveller_files) {
@@ -213,12 +219,29 @@ class OrderService {
             }
 
             if (matched_document) {
-              // Upload file to S3
+              // Only upload passport (front/back), hotel, and flight tickets to S3
+              // Other documents (photos, etc.) go to local storage
               const file_ext = path.extname(file.filename);
-              const s3_key = `orders/${order.order_id}/travellers/${traveller.order_traveller_id}/${file.file_type}/${Date.now()}-${file.filename}`;
+              let file_url: string = '';
               
-              let s3_url: string;
-              try {
+              const should_upload_to_s3 = 
+                file.file_type === 'passport_front' || 
+                file.file_type === 'passport_back' || 
+                file.file_type === 'hotel' || 
+                file.file_type === 'flight';
+              
+              // Check if S3 is configured
+              const has_access_key = env.s3.access_key_id && env.s3.access_key_id.trim().length > 0;
+              const has_secret_key = env.s3.secret_access_key && env.s3.secret_access_key.trim().length > 0;
+              const has_bucket = env.s3.bucket_name && env.s3.bucket_name.trim().length > 0;
+              const use_s3 = has_access_key && has_secret_key && has_bucket && should_upload_to_s3;
+              
+              logger.debug(`File type: ${file.file_type}, Upload to S3: ${use_s3}`);
+              
+              if (use_s3) {
+                // Upload passport/hotel/flight to S3
+                const s3_key = `orders/${order.order_id}/travellers/${traveller.order_traveller_id}/${file.file_type}/${Date.now()}-${file.filename}`;
+                
                 // Determine content type
                 const ext = file_ext.slice(1).toLowerCase();
                 let content_type = 'application/octet-stream';
@@ -226,21 +249,43 @@ class OrderService {
                 else if (ext === 'png') content_type = 'image/png';
                 else if (ext === 'pdf') content_type = 'application/pdf';
                 
-                const upload_result = await upload_to_s3({
-                  file_path: file.file_path,
-                  s3_key: s3_key,
-                  content_type: content_type,
-                  metadata: {
-                    order_id: order.order_id,
-                    traveller_id: traveller.order_traveller_id,
-                    document_type: file.file_type,
-                    original_filename: file.filename,
-                  },
-                });
-                s3_url = upload_result.s3_url;
-              } catch (error) {
-                logger.error(`Failed to upload file to S3: ${file.filename}`, error);
-                throw new Error(`Failed to upload file to S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                try {
+                  const upload_result = await upload_to_s3({
+                    file_path: file.file_path,
+                    s3_key: s3_key,
+                    content_type: content_type,
+                    metadata: {
+                      order_id: order.order_id,
+                      traveller_id: traveller.order_traveller_id,
+                      document_type: file.file_type,
+                      original_filename: file.filename,
+                    },
+                  });
+                  file_url = upload_result.s3_url;
+                  logger.debug(`Uploaded ${file.file_type} to S3: ${file_url}`);
+                } catch (error) {
+                  logger.warn(`S3 upload failed for ${file.file_type}, using local storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  // Will fallback to local storage below
+                }
+              }
+              
+              // Use local storage for non-S3 documents or if S3 upload failed
+              if (!file_url || file_url === '') {
+                const uploads_dir = path.join(process.cwd(), 'uploads', 'orders', order.order_id);
+                if (!fs.existsSync(uploads_dir)) {
+                  fs.mkdirSync(uploads_dir, { recursive: true });
+                }
+
+                const new_filename = `${traveller.order_traveller_id}-${matched_document.document_code}-${Date.now()}${file_ext}`;
+                const permanent_path = path.join(uploads_dir, new_filename);
+
+                // Copy file to permanent location
+                if (fs.existsSync(file.file_path)) {
+                  fs.copyFileSync(file.file_path, permanent_path);
+                }
+
+                file_url = `/uploads/orders/${order.order_id}/${new_filename}`;
+                logger.debug(`Stored ${file.file_type} locally: ${file_url}`);
               }
 
               // Create document record
@@ -249,7 +294,7 @@ class OrderService {
                   order_id: order.id,
                   traveller_id: traveller.id,
                   required_document_id: matched_document.id,
-                  file_url: s3_url,
+                  file_url: file_url,
                   verification_status: null,
                   verification_notes: null,
                   verified_at: null,
@@ -311,6 +356,11 @@ class OrderService {
       });
 
       // Send documents to OCR microservice asynchronously (fire and forget)
+      // OCR service will:
+      // 1. Download files from pre-signed URLs
+      // 2. Process OCR
+      // 3. Update database with OCR results
+      // 4. Send SSE events via Redis
       setImmediate(async () => {
         try {
           await this.send_documents_to_ocr_service(result.order_id);
@@ -330,6 +380,7 @@ class OrderService {
 
   /**
    * Send documents to OCR microservice for processing
+   * Main backend uploads passport/hotel/flight to S3, then sends pre-signed URLs to OCR service
    */
   private async send_documents_to_ocr_service(order_id: string): Promise<void> {
     try {
@@ -344,10 +395,13 @@ class OrderService {
         return;
       }
 
-      // Get all documents for this order
+      // Get all documents for this order (only passport/hotel/flight should be in S3)
       const documents = await prisma.orderTravellerDocument.findMany({
         where: {
           order_id: order.id,
+          file_url: {
+            startsWith: 's3://', // Only send S3 documents to OCR service
+          },
         },
         include: {
           traveller: {
@@ -360,29 +414,57 @@ class OrderService {
       });
 
       if (documents.length === 0) {
-        logger.warn(`No documents found for order ${order_id}`);
+        logger.warn(`No S3 documents found for order ${order_id} to send to OCR service`);
         return;
       }
 
-      // Group documents by type and prepare payload
-      // Need to get file_type from S3 key path or metadata
-      const documents_payload = documents.map((doc) => {
-        // Extract document type from S3 key path (format: orders/{order_id}/travellers/{traveller_id}/{document_type}/...)
-        const s3_key = doc.file_url.replace(/^s3:\/\/[^\/]+\//, '').replace(/^https?:\/\/[^\/]+\//, '');
+      // Generate pre-signed URLs for S3 files so OCR service doesn't need S3 credentials
+      const { get_signed_url, extract_s3_key_from_url } = await import('../../utils/s3.js');
+      
+      const documents_payload = await Promise.all(documents.map(async (doc) => {
+        // Extract document type from S3 key path (format: orders/{order_id}/travellers/{traveller_id}/{document_type}/{filename})
+        const s3_key = extract_s3_key_from_url(doc.file_url) || '';
         const path_parts = s3_key.split('/');
-        const doc_type_from_path = path_parts.length >= 4 ? path_parts[3] : 'other';
+        // Document type is at index 4 (after orders, order_id, travellers, traveller_id)
+        const doc_type_from_path = path_parts.length >= 5 ? path_parts[4] : 'other';
+        
+        // Generate pre-signed URL for S3 files (valid for 1 hour)
+        let file_url = doc.file_url;
+        if (doc.file_url && doc.file_url.startsWith('s3://')) {
+          try {
+            const s3_key_for_signing = extract_s3_key_from_url(doc.file_url);
+            if (s3_key_for_signing) {
+              file_url = await get_signed_url(s3_key_for_signing, 3600);
+              logger.debug(`Generated pre-signed URL for document ${doc.order_traveller_document_id}`);
+            } else {
+              logger.warn(`Could not extract S3 key from URL: ${doc.file_url}`);
+            }
+          } catch (error) {
+            logger.error(`Failed to generate pre-signed URL for ${doc.file_url}:`, error);
+            throw new Error(`Failed to generate pre-signed URL for document ${doc.order_traveller_document_id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
         
         return {
           traveller_id: doc.traveller?.order_traveller_id || '',
           traveller_name: doc.traveller?.full_name || '',
           document_id: doc.order_traveller_document_id,
-          file_url: doc.file_url,
-          document_type: this.determine_document_type(doc.file_url, doc_type_from_path),
+          file_url: file_url, // Pre-signed URL
+          document_type: this.determine_document_type(doc.file_url || '', doc_type_from_path),
         };
-      });
+      }));
 
       // Send to OCR microservice
-      const ocr_service_url = env.ocr.service_url;
+      const ocr_service_url = env.ocr.service_url || 'http://localhost:8001';
+      
+      // Only call OCR service if URL is configured (not empty)
+      if (!ocr_service_url || ocr_service_url.trim() === '') {
+        logger.info(`Skipping OCR service call for order ${order_id} (OCR service URL not configured)`);
+        return;
+      }
+      
+      logger.info(`Sending ${documents_payload.length} documents to OCR microservice for order ${order_id}`);
+      
       const response = await fetch(`${ocr_service_url}/process/documents`, {
         method: 'POST',
         headers: {
@@ -399,7 +481,7 @@ class OrderService {
         throw new Error(`OCR microservice error: ${response.status} - ${error_text}`);
       }
 
-      logger.info(`Documents sent to OCR microservice for order ${order_id}`);
+      logger.info(`✅ Documents sent to OCR microservice for order ${order_id}`);
     } catch (error) {
       logger.error(`Failed to send documents to OCR service:`, error);
       throw error;
@@ -416,12 +498,40 @@ class OrderService {
     }
     
     const url_lower = file_url.toLowerCase();
+    const filename = url_lower.split('/').pop() || '';
     
-    if (url_lower.includes('passport_front')) return 'passport_front';
-    if (url_lower.includes('passport_back')) return 'passport_back';
-    if (url_lower.includes('passport')) return 'passport';
-    if (url_lower.includes('flight')) return 'flight';
-    if (url_lower.includes('hotel')) return 'hotel';
+    // Check for passport files (front/back)
+    if (filename.includes('ppf') || filename.includes('passport_front') || (filename.includes('passport') && filename.includes('front'))) {
+      return 'passport_front';
+    }
+    if (filename.includes('ppb') || filename.includes('passport_back') || (filename.includes('passport') && filename.includes('back'))) {
+      return 'passport_back';
+    }
+    if (filename.includes('passport')) {
+      return 'passport';
+    }
+    
+    // Check for flight tickets
+    if (filename.includes('ticket') || filename.includes('flight')) {
+      return 'flight';
+    }
+    
+    // Check for hotel
+    if (filename.includes('hotel')) {
+      return 'hotel';
+    }
+    
+    // Check path for document type (S3 paths: orders/{order_id}/travellers/{traveller_id}/{document_type}/...)
+    // Path structure: [0]=orders, [1]=order_id, [2]=travellers, [3]=traveller_id, [4]=document_type, [5]=filename
+    const path_parts = url_lower.split('/');
+    const travellers_index = path_parts.findIndex(p => p === 'travellers');
+    if (travellers_index >= 0 && path_parts.length > travellers_index + 2) {
+      // Document type is 2 positions after 'travellers' (skip traveller_id)
+      const doc_type = path_parts[travellers_index + 2];
+      if (doc_type && ['passport_front', 'passport_back', 'passport', 'flight', 'hotel', 'photo', 'visa'].includes(doc_type)) {
+        return doc_type;
+      }
+    }
     
     return 'other';
   }

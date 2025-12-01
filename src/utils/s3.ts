@@ -11,6 +11,13 @@ let s3_client: S3Client | null = null;
  */
 function get_s3_client(): S3Client {
   if (!s3_client) {
+    // Only create client if credentials are provided and non-empty
+    const has_access_key = env.s3.access_key_id && env.s3.access_key_id.trim().length > 0;
+    const has_secret_key = env.s3.secret_access_key && env.s3.secret_access_key.trim().length > 0;
+    
+    if (!has_access_key || !has_secret_key) {
+      throw new Error('S3 credentials not configured');
+    }
     s3_client = new S3Client({
       region: env.s3.region,
       credentials: {

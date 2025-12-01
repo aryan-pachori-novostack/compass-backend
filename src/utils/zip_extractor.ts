@@ -47,11 +47,11 @@ export async function extract_zip_file(zip_file_path: string): Promise<Passenger
       // 1. main_folder/passengers/passenger_name/files
       // 2. main_folder/passenger_name/files (no passengers folder)
       // 3. passenger_name/files (old structure)
-      let passenger_name: string;
-      let filename: string;
+      let passenger_name: string | undefined;
+      let filename: string | undefined;
 
       // Check if structure is main_folder/passengers/passenger_name/files
-      if (path_parts.length >= 3 && path_parts[1].toLowerCase() === 'passengers') {
+      if (path_parts.length >= 3 && path_parts[1]?.toLowerCase() === 'passengers') {
         passenger_name = path_parts[2];
         filename = path_parts[path_parts.length - 1];
       } else if (path_parts.length >= 2) {
@@ -59,7 +59,7 @@ export async function extract_zip_file(zip_file_path: string): Promise<Passenger
         // Skip the first part (main folder) and use the second part as passenger name
         passenger_name = path_parts[1];
         filename = path_parts[path_parts.length - 1];
-      } else {
+      } else if (path_parts.length >= 1) {
         // Old structure: passenger_name/files
         passenger_name = path_parts[0];
         filename = path_parts[path_parts.length - 1];

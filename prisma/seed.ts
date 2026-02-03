@@ -1,10 +1,9 @@
 // @ts-ignore - This file uses tsconfig.seed.json which has verbatimModuleSyntax: false
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-interface VisaTypeData {
+interface VisaVariantData {
   name: string;
   category?: string;
   fee_inr: number;
@@ -15,7 +14,7 @@ interface VisaTypeData {
 
 interface CountryData {
   country: string;
-  visa_types: VisaTypeData[];
+  visa_types: VisaVariantData[];
 }
 
 const seed_data: CountryData[] = [
@@ -354,27 +353,52 @@ function generateIsoCode(countryName: string): string {
 }
 
 /**
- * Parse processing time string to days
+ * Parse processing time string to min and max days
  */
-function parseProcessingDays(processingTime?: string): number | null {
-  if (!processingTime) return null;
+function parseProcessingDays(processingTime?: string): { min: number | null; max: number | null } {
+  if (!processingTime) return { min: null, max: null };
   
-  // Match patterns like "3-5 working days", "5-6 days", "within 24 hours", "2–3 working days"
+  // Match patterns like "3-5 working days", "5-6 days", "2–3 working days"
   const range_match = processingTime.match(/(\d+)\s*[-–]\s*(\d+)/);
   if (range_match) {
-    return Math.ceil((parseInt(range_match[1]) + parseInt(range_match[2])) / 2);
+    return {
+      min: parseInt(range_match[1]),
+      max: parseInt(range_match[2])
+    };
   }
   
   const single_match = processingTime.match(/(\d+)/);
   if (single_match) {
-    return parseInt(single_match[1]);
+    const days = parseInt(single_match[1]);
+    return { min: days, max: days };
   }
   
   // "within 24 hours" -> 1 day
   if (processingTime.toLowerCase().includes('24 hours') || processingTime.toLowerCase().includes('within')) {
-    return 1;
+    return { min: 1, max: 1 };
   }
   
+  return { min: null, max: null };
+}
+
+/**
+ * Extract entry type from variant name (Single/Multiple)
+ */
+function extractEntryType(variantName: string): string | null {
+  const lower = variantName.toLowerCase();
+  if (lower.includes('multi')) return 'Multiple';
+  if (lower.includes('single')) return 'Single';
+  return null;
+}
+
+/**
+ * Extract duration days from variant name
+ */
+function extractDurationDays(variantName: string): number | null {
+  const match = variantName.match(/(\d+)\s*D/i);
+  if (match) {
+    return parseInt(match[1]);
+  }
   return null;
 }
 
@@ -389,7 +413,7 @@ async function main() {
     await prisma.$transaction(
       async (tx) => {
         const country_map = new Map<string, string>(); // country_name -> country.id
-        const visa_type_map = new Map<string, string>(); // "country_name|visa_name" -> visa_type.id
+        const visa_type_map = new Map<string, string>(); // "country_id|category" -> visa_type.id
 
         // Step 1: Create countries
         console.log('🌍 Seeding countries...');
@@ -400,13 +424,11 @@ async function main() {
             where: { iso_code },
             update: {
               name: country_data.country,
-              default_currency: 'INR',
               is_active: true,
             },
             create: {
               iso_code,
               name: country_data.country,
-              default_currency: 'INR',
               is_active: true,
             },
           });
@@ -415,8 +437,8 @@ async function main() {
           console.log(`  ✓ ${country.name} (${country.iso_code})`);
         }
 
-        // Step 2: Create visa types and fees
-        console.log('📋 Seeding visa types and fees...');
+        // Step 2: Create visa types (grouped by category) and variants
+        console.log('📋 Seeding visa types and variants...');
         for (const country_data of seed_data) {
           const country_id = country_map.get(country_data.country);
           if (!country_id) {
@@ -424,95 +446,125 @@ async function main() {
             continue;
           }
 
+          // Group variants by category to create VisaTypes
+          const category_map = new Map<string, VisaVariantData[]>();
           for (const visa_data of country_data.visa_types) {
-            // Create or update visa type
-            const existing = await tx.visaType.findFirst({
-              where: {
-                country_id,
-                name: visa_data.name,
-              },
-            });
-
-            let visa_type;
-            if (existing) {
-              visa_type = await tx.visaType.update({
-                where: { id: existing.id },
-                data: {
-                  category: visa_data.category || null,
-                  description: visa_data.where_to_apply || null,
-                  processing_days: parseProcessingDays(visa_data.processing_time),
-                  is_active: true,
-                },
-              });
-            } else {
-              visa_type = await tx.visaType.create({
-                data: {
-                  country_id,
-                  name: visa_data.name,
-                  category: visa_data.category || null,
-                  description: visa_data.where_to_apply || null,
-                  processing_days: parseProcessingDays(visa_data.processing_time),
-                  is_active: true,
-                },
-              });
+            const category = visa_data.category || 'Regular';
+            if (!category_map.has(category)) {
+              category_map.set(category, []);
             }
+            category_map.get(category)!.push(visa_data);
+          }
 
-            const visa_key = `${country_data.country}|${visa_data.name}`;
-            visa_type_map.set(visa_key, visa_type.id);
-            console.log(`  ✓ ${visa_data.name} (${country_data.country})`);
+          // Create VisaType for each category
+          for (const [category, variants] of category_map.entries()) {
+            const visa_type_key = `${country_id}|${category}`;
+            let visa_type_id = visa_type_map.get(visa_type_key);
 
-            // Create visa fee
-            if (visa_data.fee_inr > 0) {
-              const existing_fee = await tx.visaFee.findFirst({
+            if (!visa_type_id) {
+              // Get processing time from first variant that has it
+              const variant_with_time = variants.find(v => v.processing_time);
+              const processing = variant_with_time 
+                ? parseProcessingDays(variant_with_time.processing_time)
+                : { min: null, max: null };
+
+              // Check if visa type already exists
+              const existing_visa_type = await tx.visaType.findFirst({
                 where: {
-                  visa_type_id: visa_type.id,
-                  currency: 'INR',
-                  base_fee_amount: visa_data.fee_inr,
+                  country_id,
+                  name: category,
                 },
               });
 
-              if (!existing_fee) {
-                await tx.visaFee.create({
+              let visa_type;
+              if (existing_visa_type) {
+                visa_type = await tx.visaType.update({
+                  where: { id: existing_visa_type.id },
                   data: {
-                    visa_type_id: visa_type.id,
-                    nationality_country_id: null,
-                    base_fee_amount: visa_data.fee_inr,
-                    currency: 'INR',
-                    service_fee_amount: null,
-                    tax_amount: null,
-                    valid_from: null,
-                    valid_to: null,
+                    processing_days_min: processing.min,
+                    processing_days_max: processing.max,
+                    is_active: true,
                   },
                 });
-                console.log(`    💰 Fee: INR ${visa_data.fee_inr}`);
+              } else {
+                visa_type = await tx.visaType.create({
+                  data: {
+                    country_id,
+                    name: category,
+                    category: category === 'Regular' ? null : category,
+                    processing_days_min: processing.min,
+                    processing_days_max: processing.max,
+                    is_active: true,
+                  },
+                });
               }
+
+              visa_type_id = visa_type.id;
+              visa_type_map.set(visa_type_key, visa_type.id);
+              console.log(`  ✓ Visa Type: ${category} (${country_data.country})`);
             }
 
-            // Step 3: Create required documents
-            if (visa_data.documents_required && visa_data.documents_required.length > 0) {
-              for (const doc_name of visa_data.documents_required) {
-                const doc_code = doc_name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
-                
-                const existing_doc = await tx.visaRequiredDocument.findFirst({
-                  where: {
-                    visa_type_id: visa_type.id,
-                    document_code: doc_code,
+            // Create VisaVariants for each variant in this category
+            if (!visa_type_id) {
+              console.warn(`  ⚠ Visa type ID not found for category "${category}", skipping variants...`);
+              continue;
+            }
+
+            for (const visa_data of variants) {
+              const existing_variant = await tx.visaVariant.findFirst({
+                where: {
+                  visa_type_id: visa_type_id,
+                  variant_name: visa_data.name,
+                },
+              });
+
+              if (!existing_variant) {
+                const processing = parseProcessingDays(visa_data.processing_time);
+                const entry_type = extractEntryType(visa_data.name);
+                const duration_days = extractDurationDays(visa_data.name);
+
+                await tx.visaVariant.create({
+                  data: {
+                    visa_type_id: visa_type_id,
+                    variant_name: visa_data.name,
+                    entry_type: entry_type,
+                    duration_days: duration_days,
+                    processing_text: visa_data.processing_time || null,
+                    currency: 'INR',
+                    adult_fee: visa_data.fee_inr > 0 ? visa_data.fee_inr : null,
+                    child_fee: null, // Can be set separately if needed
+                    taxes_fee: null,
+                    is_active: true,
                   },
                 });
+                console.log(`    ✓ Variant: ${visa_data.name} (Fee: INR ${visa_data.fee_inr})`);
+              }
 
-                if (!existing_doc) {
-                  await tx.visaRequiredDocument.create({
-                    data: {
-                      visa_type_id: visa_type.id,
+              // Create required documents for this variant (linked to visa type)
+              if (visa_data.documents_required && visa_data.documents_required.length > 0) {
+                for (const doc_name of visa_data.documents_required) {
+                  const doc_code = doc_name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+                  
+                  const existing_doc = await tx.visaRequiredDocument.findFirst({
+                    where: {
+                      visa_type_id: visa_type_id,
                       document_code: doc_code,
-                      document_name: doc_name,
-                      description: null,
-                      is_mandatory: true,
-                      allowed_file_types: null,
-                      max_file_size_mb: null,
                     },
                   });
-                  console.log(`    📄 Document: ${doc_name}`);
+
+                  if (!existing_doc) {
+                    await tx.visaRequiredDocument.create({
+                      data: {
+                        visa_type_id: visa_type_id,
+                        document_code: doc_code,
+                        document_name: doc_name,
+                        is_mandatory: true,
+                        allowed_types: null,
+                        max_size_mb: null,
+                      },
+                    });
+                    console.log(`      📄 Document: ${doc_name}`);
+                  }
                 }
               }
             }
@@ -523,55 +575,6 @@ async function main() {
         timeout: 60000, // 60 seconds timeout
       }
     );
-
-    // Step 4: Seed individual partner account
-    console.log('👤 Seeding individual partner account...');
-    await prisma.$transaction(async (tx) => {
-      const partner_email = 'example@leverage.com';
-      const partner_password = 'ABCD123';
-
-      // Check if partner already exists
-      const existing_partner = await tx.partnerAccount.findUnique({
-        where: {
-          email: partner_email,
-        },
-      });
-
-      if (existing_partner) {
-        console.log(`  ⚠ Partner account with email '${partner_email}' already exists, skipping...`);
-        return;
-      }
-
-      // Hash password
-      const password_hash = await bcrypt.hash(partner_password, 10);
-
-      // Create PartnerAccount
-      const partner_account = await tx.partnerAccount.create({
-        data: {
-          partner_type: 'INDIVIDUAL',
-          email: partner_email,
-          password_hash: password_hash,
-          is_active: true,
-          kyc_verified: false,
-        },
-      });
-
-      // Create IndividualProfile with same id
-      await tx.individualProfile.create({
-        data: {
-          id: partner_account.id,
-          full_name: 'Example User',
-          phone: '+1234567890',
-          aadhaar_number: null,
-          pan_number: null,
-          date_of_birth: null,
-          nationality_id: null,
-        },
-      });
-
-      console.log(`  ✓ Individual partner account created: ${partner_email}`);
-      console.log(`  ✓ Password: ${partner_password}`);
-    });
 
     console.log('✅ Database seed completed successfully!');
   } catch (error) {

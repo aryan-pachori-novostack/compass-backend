@@ -1,3 +1,7 @@
+// =====================================
+// Prisma schema - Fresh (Compass screens)
+// =====================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,23 +11,54 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------
+// ENUMS
+// ---------------------------
+
 enum PartnerType {
   COMPANY
   INDIVIDUAL
 }
 
-enum RegistrationType {
+enum EntityType {
+  SOLE_PROPRIETORSHIP
+  PARTNERSHIP
   LLP
   PVT_LTD
   OPC
-  PARTNERSHIP
   OTHER
 }
 
-enum DocumentType {
+enum GstStatus {
+  REGISTERED
+  NOT_REGISTERED
+}
+
+enum AuthChannel {
+  EMAIL
+  PHONE
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  VERIFY_CONTACT
+}
+
+enum KycStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+enum KycDocType {
+  PAN
   AADHAAR_FRONT
   AADHAAR_BACK
-  PAN
+  GST_CERTIFICATE
+  CANCELLED_CHEQUE
   INCORPORATION_CERT
   MOA
   AOA
@@ -31,277 +66,59 @@ enum DocumentType {
   OTHER
 }
 
-enum OwnerType {
-  COMPANY
-  INDIVIDUAL
-}
-
-enum OrderStatus {
-  DRAFT
-  DOCUMENT_PENDING
-  UNDER_REVIEW
-  SUBMITTED
-  APPROVED
-  REJECTED
-  CANCELLED
-}
-
 enum OrderType {
   INDIVIDUAL
   GROUP
 }
 
-// -----------------------------------------------------
-// PARTNER ACCOUNT
-// -----------------------------------------------------
-
-model PartnerAccount {
-  id                 String   @id @default(uuid())
-  partner_account_id String   @default(uuid())
-  partner_type       PartnerType
-  email              String   @unique
-  password_hash      String
-  is_active          Boolean  @default(true)
-  kyc_verified       Boolean  @default(false)
-
-  company_profile    CompanyProfile?
-  individual_profile IndividualProfile?
-
-  orders             Order[]
-
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
+enum ServiceMode {
+  SELF_SERVED
+  COMPASS_ASSURED
 }
 
-// -----------------------------------------------------
-// COMPANY PROFILE
-// -----------------------------------------------------
-
-model CompanyProfile {
-  id                   String        @id @default(uuid())
-  company_profile_id   String        @default(uuid())
-
-  company_name         String
-  registration_type    RegistrationType
-  contact_person_name  String
-  contact_person_email String
-  contact_person_phone String
-  aadhaar_number       String?
-  pan_number           String?
-  incorporation_number String?
-  incorporation_date   DateTime?
-  registered_address   String?
-  kyc_verified_at      DateTime?
-
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
-
-  partner              PartnerAccount @relation(fields: [id], references: [id])
-  kyc_documents        KycDocument[] @relation("CompanyKycDocuments")
+enum OrderStatus {
+  DRAFT
+  ACTION_REQUIRED
+  READY_TO_PROCEED
+  IN_PROCESS
+  COMPLETED
+  CANCELLED
 }
 
-// -----------------------------------------------------
-// INDIVIDUAL PROFILE
-// -----------------------------------------------------
-
-model IndividualProfile {
-  id                      String    @id @default(uuid())
-  individual_profile_id   String    @default(uuid())
-
-  full_name               String
-  phone                   String
-  aadhaar_number          String?
-  pan_number              String?
-  date_of_birth           DateTime?
-  nationality_id          String?
-
-  nationality             Country?  @relation("IndividualNationality", fields: [nationality_id], references: [id])
-
-  kyc_verified_at         DateTime?
-  created_at              DateTime @default(now())
-  updated_at              DateTime @updatedAt
-
-  partner                 PartnerAccount @relation(fields: [id], references: [id])
-  kyc_documents           KycDocument[] @relation("IndividualKycDocuments")
+enum ApplicationSoftStatus {
+  QUALIFIED
+  DISQUALIFIED
+  PENDING
 }
 
-// -----------------------------------------------------
-// KYC DOCUMENT
-// -----------------------------------------------------
-
-model KycDocument {
-  id                  String      @id @default(uuid())
-  kyc_document_id     String      @default(uuid())
-
-  owner_type          OwnerType
-  owner_id            String
-  document_type       DocumentType
-  file_url            String
-  is_mandatory        Boolean     @default(false)
-  verification_status String?
-  verification_notes  String?
-  uploaded_at         DateTime    @default(now())
-  verified_at         DateTime?
-
-  company_owner       CompanyProfile?    @relation("CompanyKycDocuments", fields: [owner_id], references: [id], map: "kyc_document_company_owner_fkey")
-  individual_owner    IndividualProfile? @relation("IndividualKycDocuments", fields: [owner_id], references: [id], map: "kyc_document_individual_owner_fkey")
+enum ApplicationFormalitiesStatus {
+  INCOMPLETE
+  PENDING
+  IN_PROCESS
+  SUCCESSFUL
 }
 
-// -----------------------------------------------------
-// COUNTRY
-// -----------------------------------------------------
-
-model Country {
-  id                   String   @id @default(uuid())
-  country_id           String   @default(uuid())
-
-  iso_code             String   @unique
-  name                 String
-  is_active            Boolean  @default(true)
-  default_currency     String?
-
-  visa_types           VisaType[]
-  traveller_nationals  IndividualProfile[] @relation("IndividualNationality")
-
-  visa_fees            VisaFee[]
-  orders               Order[]
-  order_travellers     OrderTraveller[]
-
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
+enum VisaCaseStatus {
+  DRAFT
+  IN_REVIEW
+  IN_PROCESS
+  APPROVED
+  REJECTED
+  ON_HOLD
 }
 
-// -----------------------------------------------------
-// VISA TYPE
-// -----------------------------------------------------
-
-model VisaType {
-  id                 String   @id @default(uuid())
-  visa_type_id       String   @default(uuid())
-
-  country_id         String
-  code               String?
-  name               String
-  category           String?
-  description        String?
-  processing_days    Int?
-  is_active          Boolean @default(true)
-
-  country            Country    @relation(fields: [country_id], references: [id])
-  visa_fees          VisaFee[]
-  required_documents VisaRequiredDocument[]
-  orders             Order[]
-
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
+enum DocSource {
+  TRAVELLER_UPLOAD
+  OPS_REQUEST
+  SYSTEM_REQUIRED
 }
 
-// -----------------------------------------------------
-// VISA FEE
-// -----------------------------------------------------
-
-model VisaFee {
-  id                     String   @id @default(uuid())
-  visa_fee_id            String   @default(uuid())
-
-  visa_type_id           String
-  nationality_country_id String?
-  base_fee_amount        Float
-  currency               String
-  service_fee_amount     Float?
-  tax_amount             Float?
-  valid_from             DateTime?
-  valid_to               DateTime?
-
-  visa_type              VisaType @relation(fields: [visa_type_id], references: [id])
-  nationality            Country? @relation(fields: [nationality_country_id], references: [id])
-
-  created_at             DateTime @default(now())
-  updated_at             DateTime @updatedAt
+enum DocStatus {
+  UPLOADED
+  PENDING
+  VERIFIED
+  REJECTED
 }
-
-// -----------------------------------------------------
-// VISA REQUIRED DOCUMENT
-// -----------------------------------------------------
-
-model VisaRequiredDocument {
-  id                           String   @id @default(uuid())
-  visa_required_document_id    String   @default(uuid())
-
-  visa_type_id                 String
-  document_code                String
-  document_name                String
-  description                  String?
-  is_mandatory                 Boolean @default(true)
-  allowed_file_types           String?
-  max_file_size_mb             Int?
-
-  visa_type                    VisaType @relation(fields: [visa_type_id], references: [id])
-  traveller_documents          OrderTravellerDocument[]
-
-  created_at                  DateTime @default(now())
-  updated_at                  DateTime @updatedAt
-}
-
-// -----------------------------------------------------
-// ORDER
-// -----------------------------------------------------
-
-model Order {
-  id              String      @id @default(uuid())
-  order_id        String      @default(uuid())
-
-  partner_id      String
-  visa_type_id    String
-  country_id      String
-  order_type      OrderType
-  status          OrderStatus @default(DOCUMENT_PENDING)
-  total_fee_amount Float?
-  fee_currency     String?
-  group_name       String?
-  travel_dates     String? // JSON string or comma-separated dates
-
-  partner         PartnerAccount @relation(fields: [partner_id], references: [id])
-  visa_type       VisaType       @relation(fields: [visa_type_id], references: [id])
-  country         Country        @relation(fields: [country_id], references: [id])
-
-  travellers      OrderTraveller[]
-  documents       OrderTravellerDocument[]
-
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-}
-
-// -----------------------------------------------------
-// ORDER TRAVELLER
-// -----------------------------------------------------
-
-model OrderTraveller {
-  id                     String   @id @default(uuid())
-  order_traveller_id     String   @default(uuid())
-
-  order_id               String
-  is_primary_applicant   Boolean  @default(false)
-  full_name              String
-  date_of_birth          DateTime?
-  nationality_id         String?
-  passport_number        String?
-  passport_issue_date    DateTime?
-  passport_expiry_date   DateTime?
-  email                  String?
-  phone                  String?
-
-  order                  Order     @relation(fields: [order_id], references: [id])
-  nationality            Country?  @relation(fields: [nationality_id], references: [id])
-  documents              OrderTravellerDocument[]
-
-  created_at             DateTime @default(now())
-  updated_at             DateTime @updatedAt
-}
-
-// -----------------------------------------------------
-// ORDER TRAVELLER DOCUMENT
-// -----------------------------------------------------
 
 enum OcrStatus {
   PENDING
@@ -310,26 +127,492 @@ enum OcrStatus {
   FAILED
 }
 
-model OrderTravellerDocument {
-  id                           String   @id @default(uuid())
-  order_traveller_document_id  String   @default(uuid())
-
-  order_id                     String
-  traveller_id                 String?
-  required_document_id         String
-  file_url                     String
-  verification_status          String?
-  verification_notes           String?
-  uploaded_at                  DateTime @default(now())
-  verified_at                  DateTime?
-
-  ocr_status                   OcrStatus?
-  ocr_job_id                   String?
-  ocr_extracted_data           Json?
-  mapped_to_traveller_id       String? // For flight/hotel tickets mapped to passengers
-
-  order            Order                @relation(fields: [order_id], references: [id])
-  traveller        OrderTraveller?      @relation(fields: [traveller_id], references: [id])
-  required_document VisaRequiredDocument @relation(fields: [required_document_id], references: [id])
+enum BulkUploadStatus {
+  UPLOADED
+  PROCESSING
+  PARTIAL_SUCCESS
+  COMPLETED
+  FAILED
 }
 
+enum WalletTxnType {
+  CREDIT
+  DEBIT
+  REFUND
+}
+
+enum PaymentMethod {
+  WALLET
+  UPI
+  CARD
+  NET_BANKING
+}
+
+enum PaymentStatus {
+  INITIATED
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+enum TicketStatus {
+  UNRESOLVED
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+// ---------------------------
+// AUTH + PARTNER
+// ---------------------------
+
+model PartnerAccount {
+  id             String      @id @default(uuid())
+  partner_code   String      @unique @default(uuid())
+
+  partner_type   PartnerType
+  email          String?     @unique
+  phone          String?     @unique
+  country_code   String?     // e.g. +91
+
+  is_active      Boolean     @default(true)
+
+  // profile & KYC gating
+  kyc_status     KycStatus   @default(NOT_STARTED)
+  profile_pct    Int         @default(0)
+  last_login_at  DateTime?
+
+  profile        PartnerProfile?
+  kyc_documents  PartnerKycDocument[]
+  orders         Order[]
+  wallet         Wallet?
+  tickets        SupportTicket[]
+  activity_logs  PartnerActivityLog[]
+  auth_otps      AuthOtp[]
+
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+
+  @@index([partner_type])
+}
+
+model AuthOtp {
+  id            String      @id @default(uuid())
+  partner_id    String?
+  channel       AuthChannel
+  identifier    String      // email or phone (masked on UI; stored full)
+  purpose       OtpPurpose
+  otp_hash      String
+  expires_at    DateTime
+  verified_at   DateTime?
+
+  partner       PartnerAccount? @relation(fields: [partner_id], references: [id])
+
+  created_at    DateTime    @default(now())
+
+  @@index([identifier, purpose])
+  @@index([expires_at])
+}
+
+// ---------------------------
+// PARTNER PROFILE (what Profile screen shows)
+// ---------------------------
+
+model PartnerProfile {
+  id                    String      @id @default(uuid())
+  partner_id            String      @unique
+
+  entity_type           EntityType
+  entity_name           String
+
+  // Basic details shown (first/last for proprietor / contact person)
+  first_name            String?
+  last_name             String?
+
+  contact_email         String?
+  contact_phone         String?
+
+  pan_number            String?
+  aadhaar_number        String?
+
+  gst_status            GstStatus?
+  gst_number            String?
+
+  // “Your Compass Support”
+  relationship_manager  String?
+  operations_support    String?
+
+  registered_address    String?
+
+  partner               PartnerAccount @relation(fields: [partner_id], references: [id])
+
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@index([entity_type])
+  @@index([entity_name])
+}
+
+model PartnerKycDocument {
+  id                   String     @id @default(uuid())
+  partner_id           String
+
+  doc_type             KycDocType
+  file_url             String
+  is_mandatory         Boolean    @default(false)
+  status               DocStatus  @default(UPLOADED)
+
+  verification_notes   String?
+  uploaded_at          DateTime   @default(now())
+  verified_at          DateTime?
+
+  partner              PartnerAccount @relation(fields: [partner_id], references: [id])
+
+  @@index([partner_id, doc_type])
+  @@index([status])
+}
+
+// ---------------------------
+// VISA CATALOG (Country + Visa options)
+// ---------------------------
+
+model Country {
+  id          String   @id @default(uuid())
+  iso_code    String   @unique
+  name        String
+  is_active   Boolean  @default(true)
+  is_paused   Boolean  @default(false) // “Currently paused processing visas for this country”
+
+  visa_types  VisaType[]
+  orders      Order[]
+
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model VisaType {
+  id              String   @id @default(uuid())
+  country_id      String
+
+  name            String   // Tourist / Business / Transit
+  category        String?  // “30 Days Single Entry” etc (can also be separate)
+  processing_days_min Int?
+  processing_days_max Int?
+  validity_days   Int?
+
+  is_active       Boolean  @default(true)
+
+  country         Country  @relation(fields: [country_id], references: [id])
+  visa_variants   VisaVariant[]
+  required_docs   VisaRequiredDocument[]
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([country_id, name])
+}
+
+model VisaVariant {
+  id              String   @id @default(uuid())
+  visa_type_id    String
+
+  variant_name    String   // e.g. "30 Days Single Entry"
+  entry_type      String?  // Single/Multiple
+  duration_days   Int?
+  processing_text String?  // "3-5 Working days" (if needed)
+
+  currency        String   @default("INR")
+  adult_fee       Float?
+  child_fee       Float?
+  taxes_fee       Float?
+
+  is_active       Boolean  @default(true)
+
+  visa_type       VisaType @relation(fields: [visa_type_id], references: [id])
+  orders          Order[]
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([visa_type_id])
+}
+
+model VisaRequiredDocument {
+  id               String   @id @default(uuid())
+  visa_type_id     String
+
+  document_code    String
+  document_name    String
+  is_mandatory     Boolean  @default(true)
+  allowed_types    String?  // "PDF, JPEG, PNG"
+  max_size_mb      Int?
+
+  visa_type        VisaType @relation(fields: [visa_type_id], references: [id])
+  application_documents ApplicationDocument[]
+
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([visa_type_id])
+}
+
+// ---------------------------
+// ORDER + APPLICATIONS (Traveller detail screens)
+// ---------------------------
+
+model Order {
+  id             String      @id @default(uuid())
+  order_code      String      @unique // e.g. ORD927461835
+
+  partner_id      String
+  country_id      String
+  visa_variant_id String
+
+  order_type      OrderType
+  group_name      String?
+
+  from_country    String?     // UI shows "From India" (could be constant but keep flexible)
+  to_country_name String?     // redundant but helps snapshot; prefer derive from Country.name
+  travel_start    DateTime?
+  travel_end      DateTime?
+
+  service_mode    ServiceMode?
+  status          OrderStatus  @default(DRAFT)
+
+  fee_currency    String       @default("INR")
+  total_fee       Float?
+  wallet_used     Float?
+
+  // gating & confirmations on pay screen (checkboxes)
+  tnc_accepted_at DateTime?
+  declarations    Json?        // store all checkboxes snapshot
+
+  partner         PartnerAccount @relation(fields: [partner_id], references: [id])
+  country         Country        @relation(fields: [country_id], references: [id])
+  visa_variant    VisaVariant    @relation(fields: [visa_variant_id], references: [id])
+
+  applications    VisaApplication[]
+  bulk_uploads    BulkUpload[]
+  payments        Payment[]
+  tickets         SupportTicket[]
+  wallet_transactions WalletTransaction[]
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([partner_id, status])
+  @@index([country_id])
+  @@index([visa_variant_id])
+}
+
+model VisaApplication {
+  id                    String   @id @default(uuid())
+  application_code      String   @default(uuid()) // can show per traveller app ID if needed
+
+  order_id              String
+  is_primary_applicant  Boolean  @default(false)
+
+  full_name             String
+  email                 String?
+  phone                 String?
+
+  date_of_birth         DateTime?
+  nationality           String?  // quick string; can normalize later
+
+  passport_number       String?
+  passport_issue_date   DateTime?
+  passport_expiry_date  DateTime?
+
+  // status columns shown in orders view
+  soft_status           ApplicationSoftStatus?       // Qualified/Disqualified
+  formalities_status    ApplicationFormalitiesStatus? // Pending/Successful/In Process
+  visa_case_status      VisaCaseStatus @default(DRAFT)
+
+  // extra personal fields shown in “Basic Details”
+  sex                   String?
+  place_of_birth        String?
+  place_of_issue        String?
+  marital_status        String?
+  mother_name           String?
+  father_name           String?
+  address               String?
+  education             String?
+  profession            String?
+
+  // “Additional documents needed...” banner
+  additional_docs_needed Boolean @default(false)
+  additional_docs_note   String?
+
+  order                 Order @relation(fields: [order_id], references: [id])
+  documents             ApplicationDocument[]
+
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@index([order_id])
+  @@index([visa_case_status])
+  @@index([soft_status])
+}
+
+model ApplicationDocument {
+  id                      String    @id @default(uuid())
+  application_id          String
+
+  required_document_id    String?   // links to visa required doc when applicable
+  document_name_snapshot  String    // e.g. "Passport Front" / "Hotel Accommodation" / "Document 1"
+  source                 DocSource  @default(TRAVELLER_UPLOAD)
+
+  file_url               String?
+  status                 DocStatus  @default(PENDING)
+  verification_notes     String?
+
+  // OCR
+  ocr_status             OcrStatus  @default(PENDING)
+  ocr_job_id             String?
+  ocr_extracted_data     Json?
+
+  uploaded_at            DateTime   @default(now())
+  verified_at            DateTime?
+
+  application            VisaApplication @relation(fields: [application_id], references: [id])
+  required_document      VisaRequiredDocument? @relation(fields: [required_document_id], references: [id])
+
+  @@index([application_id])
+  @@index([status])
+}
+
+// ---------------------------
+// BULK UPLOAD (ZIP + optional CSV)
+// ---------------------------
+
+model BulkUpload {
+  id            String           @id @default(uuid())
+  order_id      String
+
+  zip_file_url  String
+  csv_file_url  String?
+  status        BulkUploadStatus @default(UPLOADED)
+  error_log     Json?
+
+  order         Order @relation(fields: [order_id], references: [id])
+
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([order_id])
+  @@index([status])
+}
+
+// ---------------------------
+// WALLET + PAYMENTS (Wallet screens)
+// ---------------------------
+
+model Wallet {
+  id          String   @id @default(uuid())
+  partner_id  String   @unique
+
+  balance     Float    @default(0)
+  currency    String   @default("INR")
+
+  partner     PartnerAccount @relation(fields: [partner_id], references: [id])
+  txns        WalletTransaction[]
+
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model WalletTransaction {
+  id             String        @id @default(uuid())
+  wallet_id       String
+
+  txn_type        WalletTxnType
+  method          PaymentMethod
+  amount          Float
+  currency        String       @default("INR")
+
+  // UI shows order-id in method rows sometimes
+  order_id        String?
+  reference_id    String?      // e.g., payment gateway txn id / internal txn id
+  note            String?
+
+  wallet          Wallet @relation(fields: [wallet_id], references: [id])
+  order           Order?  @relation(fields: [order_id], references: [id])
+
+  created_at      DateTime @default(now())
+
+  @@index([wallet_id, txn_type])
+  @@index([order_id])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  payment_code     String        @unique @default(uuid())
+
+  order_id         String
+  method           PaymentMethod
+  amount           Float
+  currency         String        @default("INR")
+
+  status           PaymentStatus @default(INITIATED)
+  gateway_txn_id   String?
+  gateway_payload  Json?
+
+  order            Order @relation(fields: [order_id], references: [id])
+
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([order_id])
+  @@index([status])
+}
+
+// ---------------------------
+// HELP & SUPPORT (Ticket screens)
+// ---------------------------
+
+model SupportTicket {
+  id               String       @id @default(uuid())
+  ticket_code       String       @unique // e.g. TCK-YYYYMMDD-XXXX
+
+  partner_id        String
+  order_id          String?
+
+  category          String
+  sub_category      String?
+  subject           String
+  description       String
+
+  status            TicketStatus @default(UNRESOLVED)
+  consent_given     Boolean      @default(false)
+
+  attachments       Json?       
+  resolution_notes  String?
+
+  partner           PartnerAccount @relation(fields: [partner_id], references: [id])
+  order             Order?         @relation(fields: [order_id], references: [id])
+
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@index([partner_id, status])
+  @@index([order_id])
+}
+
+// ---------------------------
+// ACTIVITY FEED (Dashboard “Daily Activity”)
+// ---------------------------
+
+model PartnerActivityLog {
+  id          String   @id @default(uuid())
+  partner_id  String
+
+  event_type  String   // "APPLICATION_STATUS_CHANGED", etc.
+  message     String
+  payload     Json?
+
+  partner     PartnerAccount @relation(fields: [partner_id], references: [id])
+
+  created_at  DateTime @default(now())
+
+  @@index([partner_id, created_at])
+}

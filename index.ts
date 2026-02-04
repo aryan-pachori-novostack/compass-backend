@@ -8,6 +8,21 @@ import { error_handler } from './src/middlewares/error_handler.js';
 import { api_rate_limiter } from './src/middlewares/rate_limiter.js';
 import { close_redis_connections } from './src/config/redis.js';
 
+// Import routers
+import authRouter from './src/modules/auth/auth.routes.js';
+import partnerRouter from './src/modules/partner/partner.routes.js';
+import opsPartnerRouter from './src/modules/ops/partner.routes.js';
+import catalogRouter from './src/modules/catalog/catalog.routes.js';
+import ordersRouter from './src/modules/orders/orders.routes.js';
+import applicationsRouter from './src/modules/applications/applications.routes.js';
+import documentsRouter from './src/modules/documents/documents.routes.js';
+import webhooksRouter from './src/modules/webhooks/webhooks.routes.js';
+import walletRouter from './src/modules/wallet/wallet.routes.js';
+import paymentsRouter from './src/modules/payments/payments.routes.js';
+import opsRouter from './src/modules/ops/ops.routes.js';
+import supportRouter from './src/modules/support/support.routes.js';
+import activityRouter from './src/modules/activity/activity.routes.js';
+
 const app: Express = express();
 
 // Security middleware
@@ -31,6 +46,21 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// API routes
+app.use('/auth', authRouter);
+app.use('/partner', partnerRouter);
+app.use('/ops', opsPartnerRouter);
+app.use('/catalog', catalogRouter);
+app.use('/orders', ordersRouter);
+app.use('/', applicationsRouter);
+app.use('/', documentsRouter);
+app.use('/webhooks', webhooksRouter);
+app.use('/wallet', walletRouter);
+app.use('/', paymentsRouter);
+app.use('/ops', opsRouter);
+app.use('/support', supportRouter);
+app.use('/activity', activityRouter);
 
 // Error handler middleware (must be last)
 app.use(error_handler);

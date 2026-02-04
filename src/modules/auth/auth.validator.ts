@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Request OTP validation schema
 export const requestOtpSchema = z.object({
   channel: z.enum(['EMAIL', 'PHONE'], {
-    errorMap: () => ({ message: 'Channel must be either EMAIL or PHONE' }),
+    message: 'Channel must be either EMAIL or PHONE',
   }),
   identifier: z
     .string()
@@ -21,14 +21,14 @@ export const requestOtpSchema = z.object({
       }
     ),
   purpose: z.enum(['SIGNUP', 'LOGIN'], {
-    errorMap: () => ({ message: 'Purpose must be either SIGNUP or LOGIN' }),
+    message: 'Purpose must be either SIGNUP or LOGIN',
   }),
 });
 
 // Verify OTP validation schema
 export const verifyOtpSchema = z.object({
   channel: z.enum(['EMAIL', 'PHONE'], {
-    errorMap: () => ({ message: 'Channel must be either EMAIL or PHONE' }),
+    message: 'Channel must be either EMAIL or PHONE',
   }),
   identifier: z
     .string()
@@ -48,7 +48,7 @@ export const verifyOtpSchema = z.object({
     .length(6, 'OTP must be exactly 6 digits')
     .regex(/^\d+$/, 'OTP must contain only digits'),
   purpose: z.enum(['SIGNUP', 'LOGIN'], {
-    errorMap: () => ({ message: 'Purpose must be either SIGNUP or LOGIN' }),
+    message: 'Purpose must be either SIGNUP or LOGIN',
   }),
 });
 
@@ -74,5 +74,5 @@ export function extractCountryCode(phone: string): string | null {
   // Phone format: +[country_code][number]
   // Extract country code (typically 1-3 digits after +)
   const match = phone.match(/^\+(\d{1,3})/);
-  return match ? match[1] : null;
+  return match && match[1] ? match[1] : null;
 }

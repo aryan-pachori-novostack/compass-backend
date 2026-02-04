@@ -1,0 +1,1704 @@
+{
+	"info": {
+		"_postman_id": "compass-backend-api",
+		"name": "Compass Backend API",
+		"description": "Complete API collection for Compass visa processing platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Request OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has success\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"channel\": \"EMAIL\",\n  \"identifier\": \"partner@example.com\",\n  \"purpose\": \"SIGNUP\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/request-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "request-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has token\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.token).to.exist;",
+									"    pm.environment.set(\"partner_token\", jsonData.token);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"channel\": \"EMAIL\",\n  \"identifier\": \"partner@example.com\",\n  \"otp\": \"123456\",\n  \"purpose\": \"SIGNUP\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "verify-otp"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current Session",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "me"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Partner Profile & KYC",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/partner/profile",
+							"host": ["{{base_url}}"],
+							"path": ["partner", "profile"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"entity_type\": \"SOLE_PROPRIETORSHIP\",\n  \"entity_name\": \"ABC Travels\",\n  \"first_name\": \"Amit\",\n  \"last_name\": \"Shah\",\n  \"pan_number\": \"ABCDE1234F\",\n  \"aadhaar_number\": \"1234-5678-9012\",\n  \"gst_status\": \"REGISTERED\",\n  \"gst_number\": \"27ABCDE1234F1Z5\",\n  \"registered_address\": \"Mumbai, India\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/partner/profile",
+							"host": ["{{base_url}}"],
+							"path": ["partner", "profile"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get KYC Documents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/partner/kyc-documents",
+							"host": ["{{base_url}}"],
+							"path": ["partner", "kyc-documents"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload KYC Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "doc_type",
+									"value": "PAN",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/partner/kyc-documents/upload",
+							"host": ["{{base_url}}"],
+							"path": ["partner", "kyc-documents", "upload"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Submit KYC",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/partner/kyc/submit",
+							"host": ["{{base_url}}"],
+							"path": ["partner", "kyc", "submit"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Visa Catalog",
+			"item": [
+				{
+					"name": "Get Countries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/catalog/countries?includePaused=true",
+							"host": ["{{base_url}}"],
+							"path": ["catalog", "countries"],
+							"query": [
+								{
+									"key": "includePaused",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Visa Types by Country",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/catalog/countries/:countryId/visa-types",
+							"host": ["{{base_url}}"],
+							"path": ["catalog", "countries", ":countryId", "visa-types"],
+							"variable": [
+								{
+									"key": "countryId",
+									"value": "country-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Visa Variants by Visa Type",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/catalog/visa-types/:visaTypeId/variants",
+							"host": ["{{base_url}}"],
+							"path": ["catalog", "visa-types", ":visaTypeId", "variants"],
+							"variable": [
+								{
+									"key": "visaTypeId",
+									"value": "visa-type-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Complete Visa Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/catalog/visa-variants/:variantId",
+							"host": ["{{base_url}}"],
+							"path": ["catalog", "visa-variants", ":variantId"],
+							"variable": [
+								{
+									"key": "variantId",
+									"value": "variant-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Required Documents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/catalog/visa-types/:visaTypeId/documents",
+							"host": ["{{base_url}}"],
+							"path": ["catalog", "visa-types", ":visaTypeId", "documents"],
+							"variable": [
+								{
+									"key": "visaTypeId",
+									"value": "visa-type-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Create Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.json().id) {",
+									"    pm.environment.set(\"order_id\", pm.response.json().id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"visa_variant_id\": \"variant-id-here\",\n  \"order_type\": \"INDIVIDUAL\",\n  \"service_mode\": \"SELF_SERVED\",\n  \"group_name\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": ["{{base_url}}"],
+							"path": ["orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["orders"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Travel Dates",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"travel_start\": \"2026-03-01\",\n  \"travel_end\": \"2026-03-15\",\n  \"from_country\": \"India\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/travel-dates",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "travel-dates"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Checkout Preview",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/checkout/preview",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "checkout", "preview"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Checkout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"declarations\": {\n    \"tnc\": true,\n    \"authentic_docs\": true,\n    \"authorize_processing\": true\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/checkout/confirm",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "checkout", "confirm"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Pay Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.json().payment && pm.response.json().payment.payment_id) {",
+									"    pm.environment.set(\"payment_id\", pm.response.json().payment.payment_id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"use_wallet\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/pay",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "pay"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/cancel",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "cancel"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Applications",
+			"item": [
+				{
+					"name": "Add Traveller",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.json().id) {",
+									"    pm.environment.set(\"application_id\", pm.response.json().id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"is_primary_applicant\": true,\n  \"full_name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"9999999999\",\n  \"date_of_birth\": \"1995-01-01\",\n  \"nationality\": \"India\",\n  \"passport_number\": \"A1234567\",\n  \"passport_issue_date\": \"2021-01-01\",\n  \"passport_expiry_date\": \"2031-01-01\",\n  \"sex\": \"Male\",\n  \"place_of_birth\": \"Mumbai\",\n  \"place_of_issue\": \"Mumbai\",\n  \"marital_status\": \"Single\",\n  \"mother_name\": \"Jane Doe\",\n  \"father_name\": \"John Doe Sr\",\n  \"address\": \"123 Main St, Mumbai\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/applications",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "applications"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Travellers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/applications",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "applications"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Application Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/applications/{{application_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["applications", "{{application_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Application",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"John Doe Updated\",\n  \"email\": \"john.updated@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/applications/{{application_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["applications", "{{application_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set Primary Applicant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/applications/{{application_id}}/set-primary",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "applications", "{{application_id}}", "set-primary"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Application",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/applications/{{application_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["applications", "{{application_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Application Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/orders/{{order_id}}/applications/summary",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "{{order_id}}", "applications", "summary"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documents",
+			"item": [
+				{
+					"name": "List Required Documents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/applications/{{application_id}}/documents/required",
+							"host": ["{{base_url}}"],
+							"path": ["applications", "{{application_id}}", "documents", "required"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Document",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.json().id) {",
+									"    pm.environment.set(\"document_id\", pm.response.json().id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "required_document_id",
+									"value": "required-doc-id-here",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "document_name",
+									"value": "Passport",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/applications/{{application_id}}/documents/upload",
+							"host": ["{{base_url}}"],
+							"path": ["applications", "{{application_id}}", "documents", "upload"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Documents",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/applications/{{application_id}}/documents",
+							"host": ["{{base_url}}"],
+							"path": ["applications", "{{application_id}}", "documents"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/documents/{{document_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["documents", "{{document_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Retry OCR",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/documents/{{document_id}}/retry-ocr",
+							"host": ["{{base_url}}"],
+							"path": ["documents", "{{document_id}}", "retry-ocr"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Wallet & Payments",
+			"item": [
+				{
+					"name": "Get Wallet",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.json().balance !== undefined) {",
+									"    pm.environment.set(\"wallet_balance\", pm.response.json().balance);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/wallet",
+							"host": ["{{base_url}}"],
+							"path": ["wallet"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Wallet Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/wallet/transactions?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["wallet", "transactions"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "txn_type",
+									"value": "CREDIT",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Initiate Wallet Topup",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.json().payment_id) {",
+									"    pm.environment.set(\"payment_id\", pm.response.json().payment_id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 2000,\n  \"method\": \"UPI\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/wallet/topup/initiate",
+							"host": ["{{base_url}}"],
+							"path": ["wallet", "topup", "initiate"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/{{payment_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["payments", "{{payment_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Payment Webhook (Mock)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "x-payment-api-key",
+								"value": "ops-secret-key",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"gateway_txn_id\": \"gtw-123456\",\n  \"status\": \"SUCCESS\",\n  \"amount\": 2000,\n  \"currency\": \"INR\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/webhooks/payment",
+							"host": ["{{base_url}}"],
+							"path": ["webhooks", "payment"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ops",
+			"item": [
+				{
+					"name": "Ops Application Queue",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ops/applications?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "visa_case_status",
+									"value": "IN_REVIEW",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "ORD",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ops Application Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ops/applications/{{application_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications", "{{application_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Application Status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"visa_case_status\": \"IN_PROCESS\",\n  \"soft_status\": \"QUALIFIED\",\n  \"formalities_status\": \"IN_PROCESS\",\n  \"note\": \"Verified passport and ticket, moved to processing\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/applications/{{application_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications", "{{application_id}}", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Application",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"note\": \"Approved, visa issued\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/applications/{{application_id}}/approve",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications", "{{application_id}}", "approve"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Application",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Passport expired\",\n  \"note\": \"Please upload valid passport\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/applications/{{application_id}}/reject",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications", "{{application_id}}", "reject"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Put Application On Hold",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"note\": \"Awaiting embassy clarification\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/applications/{{application_id}}/on-hold",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications", "{{application_id}}", "on-hold"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Request Additional Documents",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"note\": \"Need updated bank statements\",\n  \"documents\": [\n    { \"name\": \"Bank Statement 6 months\" },\n    { \"name\": \"Hotel confirmation\" }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/applications/{{application_id}}/request-docs",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "applications", "{{application_id}}", "request-docs"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"VERIFIED\",\n  \"verification_notes\": \"Document verified successfully\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/documents/{{document_id}}/verify",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "documents", "{{document_id}}", "verify"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ops List Tickets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/ops/support/tickets?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "support", "tickets"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "UNRESOLVED",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Ticket Status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ops_token}}",
+								"type": "text"
+							},
+							{
+								"key": "x-ops-token",
+								"value": "ops-secret-key",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"RESOLVED\",\n  \"resolution_notes\": \"Asked partner to reupload passport in JPEG format\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/ops/support/tickets/:ticketId/status",
+							"host": ["{{base_url}}"],
+							"path": ["ops", "support", "tickets", ":ticketId", "status"],
+							"variable": [
+								{
+									"key": "ticketId",
+									"value": "ticket-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Support & Activity",
+			"item": [
+				{
+					"name": "Create Ticket",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_id\": \"{{order_id}}\",\n  \"category\": \"Visa Process\",\n  \"sub_category\": \"Document Issue\",\n  \"subject\": \"Passport upload failing\",\n  \"description\": \"I am unable to upload my passport PDF\",\n  \"consent_given\": true,\n  \"attachments\": [\n    \"https://file1.example.com\",\n    \"https://file2.example.com\"\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/support/tickets",
+							"host": ["{{base_url}}"],
+							"path": ["support", "tickets"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Tickets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/support/tickets?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["support", "tickets"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "UNRESOLVED",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/support/tickets/:ticketId",
+							"host": ["{{base_url}}"],
+							"path": ["support", "tickets", ":ticketId"],
+							"variable": [
+								{
+									"key": "ticketId",
+									"value": "ticket-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Activity Feed",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{partner_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/activity?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["activity"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "partner_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "ops_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "order_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "application_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "document_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "payment_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallet_balance",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
